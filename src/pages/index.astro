@@ -1,8 +1,9 @@
 ---
 // ============================================================
 // Muvix‑VQ – Homepage (index.astro)
-// Edge‑to‑edge layout: main content + fixed right sidebar
+// Now uses the BaseLayout for a consistent header/footer
 // ============================================================
+import BaseLayout from '../layouts/BaseLayout.astro';
 
 // ---------- ENVIRONMENT ----------
 const TMDB_PROXY = import.meta.env.PUBLIC_TMDB_PROXY || '';
@@ -319,337 +320,7 @@ const scheduleData = await fetchScheduleData();
 const completedData = completedFirstPage;
 ---
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Muvix‑VQ · Stream Anime, Movies & TV</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    /* =============================================
-       FINALIZED COLOR SCHEMA & GLOBAL STYLES
-    ============================================= */
-    :root {
-      --bg-body: #132633;
-      --bg-header: #1e2d3a;
-      --text-widget-title: #a2c4de;
-      --btn-primary: #597691;
-      --btn-primary-hover: #455d73;
-      --btn-secondary: #5d7080;
-      --btn-secondary-hover: #4a5a69;
-      --btn-text: #ffffff;
-      --popup-bg: #506096;
-      --popup-btn: #C0A8FF;
-      --popup-btn-text: #1A1A2E;
-      --popup-btn-hover: #CFBBFF;
-      --show-info-bg: #283654;
-      --genre-tag-bg: #bf8fe3;
-      --link-accent: #FF7B9C;
-      --ep-current: #3B7A99;
-      --ep-watched: #476d80;
-      --footer-bg: #d4d6d8;
-      --dropdown-hover-text: #8ba3f0;
-      --font-title: 'Archivo Black', sans-serif;
-      --font-body: 'Inter', sans-serif;
-      --font-meta: 'Poppins', sans-serif;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: var(--bg-body);
-      font-family: var(--font-body);
-      color: #fff;
-      line-height: 1.5;
-      overflow-x: hidden;
-    }
-    a { text-decoration: none; color: inherit; }
-
-    /* ---------- HEADER ---------- */
-    .site-header {
-      background: var(--bg-header);
-      padding: 12px 24px;
-      display: flex; align-items: center; gap: 28px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      position: sticky; top: 0; z-index: 100;
-    }
-    .logo { font-family: var(--font-title); font-size: 1.5rem; letter-spacing: -1px; }
-    .main-nav a { font-size: 0.9rem; font-weight: 500; margin-right: 20px; transition: color 0.2s; }
-    .main-nav a:hover { color: var(--dropdown-hover-text); }
-
-    /* ---------- HERO SLIDER (full width) ---------- */
-    .hero-slider { position: relative; width: 100%; height: 75vh; overflow: hidden; }
-    .slides-container { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
-    .slide {
-      min-width: 100%; height: 100%; background-size: cover; background-position: center;
-      position: relative; display: flex; align-items: flex-end; padding: 0 5%;
-    }
-    .slide::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: linear-gradient(to right, rgba(19,38,51,0.95) 30%, rgba(19,38,51,0.3) 100%);
-    }
-    .slide-content { position: relative; z-index: 2; max-width: 600px; margin-bottom: 10%; }
-    .slide-title {
-      font-family: var(--font-title); font-size: clamp(28px, 5vw, 36px);
-      margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.6);
-    }
-    .slide-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; margin-bottom: 16px; }
-    .meta-item {
-      background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-weight: 500;
-    }
-    .meta-item.clickable { cursor: pointer; }
-    .meta-item.clickable:hover { background: rgba(255,255,255,0.2); }
-    .slide-description { font-size: 0.9rem; color: rgba(255,255,255,0.8); margin-bottom: 20px; line-height: 1.6; }
-    .slide-actions { display: flex; align-items: center; gap: 16px; }
-    .btn-watch {
-      background: var(--btn-primary); color: var(--btn-text); padding: 12px 24px;
-      border-radius: 50px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
-      transition: background 0.2s, transform 0.1s;
-    }
-    .btn-watch:hover { background: var(--btn-primary-hover); transform: scale(1.02); }
-    .btn-heart {
-      width: 48px; height: 48px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.15); border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; cursor: pointer; color: white;
-      transition: background 0.2s;
-    }
-    .btn-heart:hover { background: rgba(255,255,255,0.2); }
-    .btn-heart[aria-pressed="true"] { color: var(--link-accent); background: rgba(255,123,156,0.2); }
-    .slider-nav {
-      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 20px;
-      background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-radius: 30px; padding: 8px 24px;
-    }
-    .slider-arrow { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
-    .slide-counter { font-size: 0.9rem; }
-    .slider-dots {
-      position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .dot { width: 8px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 50%; cursor: pointer; }
-    .dot.active { background: white; }
-
-    /* ---------- TWO‑COLUMN LAYOUT (Edge‑to‑edge) ---------- */
-    .main-layout {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: 0;                  /* no left/right padding on desktop */
-      display: flex;
-      gap: 2rem;                  /* gap‑8 = 2rem */
-      align-items: flex-start;
-    }
-    .main-content {
-      flex: 1;                    /* takes all remaining space */
-      min-width: 0;               /* allow shrinking for grid */
-    }
-    .right-sidebar {
-      width: 340px;               /* fixed width between 320‑350 */
-      flex-shrink: 0;
-    }
-
-    /* ---------- SECTIONS ---------- */
-    .section { margin: 30px 0; }
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .section-title { font-family: var(--font-title); font-size: 1.5rem; color: var(--text-widget-title); }
-    .section-controls { display: flex; align-items: center; gap: 10px; }
-    .view-all {
-      font-size: 0.85rem; font-weight: 600; color: var(--link-accent);
-      border: 1px solid var(--link-accent); border-radius: 30px; padding: 6px 14px; transition: background 0.2s;
-    }
-    .view-all:hover { background: rgba(255,123,156,0.15); }
-    .scroll-arrow {
-      width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: white; font-size: 1.1rem; transition: background 0.2s;
-    }
-    .scroll-arrow:hover { background: rgba(255,255,255,0.15); }
-
-    .horizontal-scroll {
-      display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth; padding-bottom: 10px;
-    }
-    .horizontal-scroll::-webkit-scrollbar { display: none; }
-    .show-card-horiz { flex: 0 0 auto; width: 165px; text-align: center; }
-    .card-poster {
-      width: 100%; aspect-ratio: 3/4.5; background-size: cover; background-position: center;
-      border-radius: 12px; position: relative; margin-bottom: 8px; overflow: hidden;
-    }
-    .ranking-badge {
-      position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white;
-      font-weight: 700; font-size: 0.85rem; padding: 2px 8px; border-radius: 4px;
-    }
-    .card-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .grid-container {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 18px;
-    }
-    @media (min-width: 768px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } }
-    @media (min-width: 1024px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); } }
-    .show-card-grid { border-radius: 12px; overflow: hidden; position: relative; }
-    .show-card-grid .card-poster { aspect-ratio: 3/4.5; width: 100%; background-size: cover; }
-    .poster-badge {
-      position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white;
-      padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;
-    }
-    .poster-badge.right { left: auto; right: 8px; }
-    .card-meta-grid { padding: 6px 8px; font-size: 0.75rem; color: rgba(255,255,255,0.7); }
-    .card-title-grid { font-weight: 600; font-size: 0.85rem; margin-top: 2px; padding: 0 8px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    /* Toggle tabs */
-    .toggle-tabs { display: flex; gap: 6px; }
-    .toggle-tab {
-      padding: 6px 14px; border-radius: 30px; background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1); font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
-    }
-    .toggle-tab.active { background: var(--popup-btn); color: var(--popup-btn-text); border-color: var(--popup-btn); font-weight: 600; }
-
-    /* ---------- SIDEBAR ---------- */
-    .sidebar-widget {
-      background: var(--show-info-bg);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-    .sidebar-widget .section-title { font-size: 1.2rem; margin-bottom: 12px; }
-
-    /* ---------- SCHEDULE WIDGET ---------- */
-    .esw-head {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
-    }
-    .esw-title {
-      font-size: 13px; font-weight: 700; color: var(--text-widget-title);
-      letter-spacing: 0.5px; text-transform: uppercase;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .esw-clock {
-      display: flex; align-items: center; gap: 7px;
-      background: var(--bg-header); border: 1px solid var(--btn-primary);
-      border-radius: 999px; padding: 5px 12px; flex-shrink: 0;
-    }
-    .esw-clock-world { width: 14px; height: 14px; flex-shrink: 0; }
-    .esw-clock-inner { display: flex; align-items: center; gap: 6px; }
-    .esw-clock-date { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.6); }
-    .esw-clock-sep { font-size: 10px; color: rgba(255,255,255,0.3); }
-    .esw-clock-time { font-size: 11px; font-weight: 700; color: var(--text-widget-title); }
-    .esw-days {
-      display: flex; align-items: center; padding: 8px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; gap: 0;
-    }
-    .esw-nav {
-      background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer;
-      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; border-radius: 4px; transition: color 0.2s, background 0.2s;
-    }
-    .esw-nav:hover { color: var(--popup-btn); background: var(--bg-header); }
-    .esw-days-scroll {
-      display: flex; gap: 4px; flex: 1; overflow: hidden; justify-content: space-between;
-    }
-    .esw-day-card {
-      flex: 1; min-width: 0; background: var(--bg-header);
-      border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
-      padding: 6px 2px; text-align: center; cursor: pointer;
-      transition: all 0.18s; user-select: none;
-    }
-    .esw-day-card:hover { border-color: var(--popup-btn); background: var(--show-info-bg); }
-    .esw-day-card.esw-active { background: var(--btn-primary); border-color: var(--popup-btn); }
-    .esw-day-card.esw-today { border-color: var(--link-accent) !important; }
-    .esw-day-card.esw-today .esw-dc-day { color: var(--link-accent); }
-    .esw-dc-day { font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; }
-    .esw-dc-date { font-size: 15px; font-weight: 800; color: #fff; line-height: 1.1; margin: 1px 0; }
-    .esw-dc-month { font-size: 8px; color: rgba(255,255,255,0.5); }
-    .esw-day-card.esw-active .esw-dc-day,
-    .esw-day-card.esw-active .esw-dc-date,
-    .esw-day-card.esw-active .esw-dc-month { color: #fff; }
-    .esw-day-card.esw-today.esw-active .esw-dc-day { color: var(--link-accent); }
-    .esw-body { padding: 4px 0; }
-    .esw-status-bar {
-      font-size: 11px; color: rgba(255,255,255,0.4); padding: 4px 0 8px;
-      display: flex; align-items: center; gap: 5px;
-    }
-    .esw-rows { display: flex; flex-direction: column; gap: 5px; }
-    .esw-row {
-      display: flex; align-items: center; gap: 8px;
-      background: var(--bg-header); border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 8px; padding: 8px 10px; cursor: pointer;
-      transition: all 0.18s; text-decoration: none; color: inherit;
-    }
-    .esw-row:hover { border-color: var(--popup-btn); background: var(--show-info-bg); }
-    .esw-row-time {
-      font-size: 11px; font-weight: 700; color: var(--text-widget-title);
-      min-width: 38px; flex-shrink: 0;
-    }
-    .esw-row-title {
-      flex: 1; font-size: 12px; font-weight: 500; color: #fff;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
-    }
-    .esw-row-ep {
-      font-size: 10px; color: rgba(255,255,255,0.6);
-      background: var(--show-info-bg); border: 1px solid var(--btn-primary);
-      border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0;
-    }
-    .esw-row-btn {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: var(--btn-primary); border: none; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; transition: background 0.2s;
-    }
-    .esw-row-btn:hover { background: var(--btn-primary-hover); }
-    .esw-row-btn svg { width: 11px; height: 11px; }
-    .esw-aired { opacity: 0.45; }
-    .esw-aired .esw-row-time { color: rgba(255,255,255,0.4); }
-    .esw-more-wrap { margin-top: 8px; display: flex; justify-content: flex-end; }
-    .esw-more-btn {
-      background: none; border: 1px solid var(--btn-primary);
-      color: var(--popup-btn); border-radius: 6px; padding: 4px 12px;
-      font-size: 11px; cursor: pointer; transition: all 0.2s; font-family: inherit;
-    }
-    .esw-more-btn:hover { background: var(--btn-primary); color: #fff; }
-    .esw-empty { text-align: center; padding: 20px 12px; color: rgba(255,255,255,0.4); font-size: 12px; }
-
-    /* ---------- FOOTER ---------- */
-    .site-footer { background: var(--footer-bg); color: #1a1a2e; padding: 30px 20px; text-align: center; margin-top: 60px; }
-
-    /* ---------- RESPONSIVE ---------- */
-    @media (max-width: 1024px) {
-      .main-layout {
-        flex-direction: column;
-        padding: 0 1rem;   /* px‑4 on mobile */
-      }
-      .main-content { flex: none; width: 100%; }
-      .right-sidebar { width: 100%; }
-    }
-    @media (max-width: 768px) {
-      .hero-slider { height: 55vh; }
-      .slider-nav .slider-arrow { display: none; }
-      .horizontal-scroll { gap: 12px; }
-      .show-card-horiz { width: 135px; }
-      .esw-clock { padding: 4px 10px; gap: 4px; }
-      .esw-clock-date { font-size: 9px; }
-      .esw-clock-time { font-size: 10px; }
-      .esw-dc-date { font-size: 13px; }
-      .esw-row-title { font-size: 11px; }
-    }
-    @media (max-width: 360px) {
-      .esw-clock-date, .esw-clock-sep { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <!-- ===== HEADER ===== -->
-  <header class="site-header">
-    <div class="logo">◈ Muvix-VQ</div>
-    <nav class="main-nav">
-      <a href="/">Home</a>
-      <a href="#">Genre ▾</a>
-      <a href="#">Country ▾</a>
-      <a href="#">Types ▾</a>
-      <a href="/search?q=new-releases">New Releases</a>
-      <a href="/status/upcoming">Upcoming</a>
-    </nav>
-  </header>
-
+<BaseLayout>
   <!-- ===== HERO SLIDER (full width) ===== -->
   <section class="hero-slider" id="heroSlider">
     <div class="slides-container" id="slidesContainer">
@@ -692,10 +363,8 @@ const completedData = completedFirstPage;
 
   <!-- ===== MAIN LAYOUT (Two Columns, edge‑to‑edge) ===== -->
   <div class="main-layout">
-
     <!-- ===== LEFT: MAIN CONTENT (flexible) ===== -->
     <div class="main-content">
-
       <!-- Top Airing -->
       <section class="section">
         <div class="section-header">
@@ -795,7 +464,6 @@ const completedData = completedFirstPage;
 
     <!-- ===== RIGHT: FIXED SIDEBAR ===== -->
     <aside class="right-sidebar">
-
       <!-- Trending Now -->
       <div class="sidebar-widget">
         <div class="section-header" style="margin-bottom: 12px;">
@@ -882,243 +550,450 @@ const completedData = completedFirstPage;
           </div>
         </div>
       </div>
-
     </aside>
   </div>
+</BaseLayout>
 
-  <!-- ===== FOOTER ===== -->
-  <footer class="site-footer">
-    <strong>Muvix-VQ</strong> · © 2025 — All rights reserved.
-  </footer>
+<style>
+  /* =============================================
+     HOMEPAGE‑SPECIFIC STYLES (layout already handles header/footer)
+  ============================================= */
+  :root {
+    --bg-body: #132633;
+    --bg-header: #1e2d3a;
+    --text-widget-title: #a2c4de;
+    --btn-primary: #597691;
+    --btn-primary-hover: #455d73;
+    --btn-secondary: #5d7080;
+    --btn-secondary-hover: #4a5a69;
+    --btn-text: #ffffff;
+    --popup-bg: #506096;
+    --popup-btn: #C0A8FF;
+    --popup-btn-text: #1A1A2E;
+    --popup-btn-hover: #CFBBFF;
+    --show-info-bg: #283654;
+    --genre-tag-bg: #bf8fe3;
+    --link-accent: #FF7B9C;
+    --ep-current: #3B7A99;
+    --ep-watched: #476d80;
+    --footer-bg: #d4d6d8;
+    --dropdown-hover-text: #8ba3f0;
+    --font-title: 'Archivo Black', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-meta: 'Poppins', sans-serif;
+  }
 
-  <!-- ===== SCRIPTS ===== -->
-  <script>
-    // ---------- HERO SLIDER ----------
-    const slidesContainer = document.getElementById('slidesContainer');
-    const prevBtn = document.getElementById('prevSlide');
-    const nextBtn = document.getElementById('nextSlide');
-    const counter = document.getElementById('slideCounter');
-    const dots = document.querySelectorAll('#sliderDots .dot');
-    let currentSlide = 0;
-    const totalSlides = {heroData.length};
+  /* Hero slider */
+  .hero-slider { position: relative; width: 100%; height: 75vh; overflow: hidden; }
+  .slides-container { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
+  .slide {
+    min-width: 100%; height: 100%; background-size: cover; background-position: center;
+    position: relative; display: flex; align-items: flex-end; padding: 0 5%;
+  }
+  .slide::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to right, rgba(19,38,51,0.95) 30%, rgba(19,38,51,0.3) 100%);
+  }
+  .slide-content { position: relative; z-index: 2; max-width: 600px; margin-bottom: 10%; }
+  .slide-title {
+    font-family: var(--font-title); font-size: clamp(28px, 5vw, 36px);
+    margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  }
+  .slide-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; margin-bottom: 16px; }
+  .meta-item {
+    background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-weight: 500;
+  }
+  .meta-item.clickable { cursor: pointer; }
+  .meta-item.clickable:hover { background: rgba(255,255,255,0.2); }
+  .slide-description { font-size: 0.9rem; color: rgba(255,255,255,0.8); margin-bottom: 20px; line-height: 1.6; }
+  .slide-actions { display: flex; align-items: center; gap: 16px; }
+  .btn-watch {
+    background: var(--btn-primary); color: var(--btn-text); padding: 12px 24px;
+    border-radius: 50px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-watch:hover { background: var(--btn-primary-hover); transform: scale(1.02); }
+  .btn-heart {
+    width: 48px; height: 48px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: white;
+    transition: background 0.2s;
+  }
+  .btn-heart:hover { background: rgba(255,255,255,0.2); }
+  .btn-heart[aria-pressed="true"] { color: var(--link-accent); background: rgba(255,123,156,0.2); }
+  .slider-nav {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 20px;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-radius: 30px; padding: 8px 24px;
+  }
+  .slider-arrow { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+  .slide-counter { font-size: 0.9rem; }
+  .slider-dots {
+    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .dot { width: 8px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 50%; cursor: pointer; }
+  .dot.active { background: white; }
 
-    function goToSlide(index) {
-      currentSlide = (index + totalSlides) % totalSlides;
-      slidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
-      counter.textContent = `${currentSlide + 1} / ${totalSlides}`;
-      dots.forEach(d => d.classList.remove('active'));
-      if (dots[currentSlide]) dots[currentSlide].classList.add('active');
-    }
-    prevBtn.addEventListener('click', () => goToSlide(currentSlide - 1));
-    nextBtn.addEventListener('click', () => goToSlide(currentSlide + 1));
-    dots.forEach(dot => dot.addEventListener('click', () => goToSlide(parseInt(dot.dataset.index))));
-    setInterval(() => goToSlide(currentSlide + 1), 6000);
-    goToSlide(0);
+  /* Two‑column layout */
+  .main-layout {
+    max-width: 1440px; margin: 0 auto; padding: 0;
+    display: flex; gap: 2rem; align-items: flex-start;
+  }
+  .main-content { flex: 1; min-width: 0; }
+  .right-sidebar { width: 340px; flex-shrink: 0; }
 
-    // ---------- HORIZONTAL SCROLL ----------
-    function setupScroll(containerId, leftBtnId, rightBtnId) {
-      const container = document.getElementById(containerId);
-      const left = document.getElementById(leftBtnId);
-      const right = document.getElementById(rightBtnId);
-      if (!container || !left || !right) return;
-      left.addEventListener('click', () => container.scrollBy({ left: -350, behavior: 'smooth' }));
-      right.addEventListener('click', () => container.scrollBy({ left: 350, behavior: 'smooth' }));
-    }
-    setupScroll('topAiringScroll', 'topAiringLeft', 'topAiringRight');
-    setupScroll('upcomingScroll', 'upcomingLeft', 'upcomingRight');
+  /* Sections */
+  .section { margin: 30px 0; }
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .section-title { font-family: var(--font-title); font-size: 1.5rem; color: var(--text-widget-title); }
+  .section-controls { display: flex; align-items: center; gap: 10px; }
+  .view-all {
+    font-size: 0.85rem; font-weight: 600; color: var(--link-accent);
+    border: 1px solid var(--link-accent); border-radius: 30px; padding: 6px 14px; transition: background 0.2s;
+  }
+  .view-all:hover { background: rgba(255,123,156,0.15); }
+  .scroll-arrow {
+    width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: white; font-size: 1.1rem; transition: background 0.2s;
+  }
+  .scroll-arrow:hover { background: rgba(255,255,255,0.15); }
 
-    // ---------- NEW RELEASES TOGGLE ----------
-    const releaseTabs = document.querySelectorAll('#releaseTabs .toggle-tab');
-    const grid = document.getElementById('newReleasesGrid');
-    const titleElem = document.getElementById('newReleasesTitle');
-    releaseTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        releaseTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const filter = tab.dataset.filter;
-        grid.querySelectorAll('.show-card-grid').forEach(card => {
-          card.style.display = (filter === 'all' || card.dataset.type === filter) ? '' : 'none';
-        });
-        titleElem.textContent = filter === 'all' ? 'New Releases' : `Latest ${tab.textContent}`;
+  .horizontal-scroll { display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth; padding-bottom: 10px; }
+  .horizontal-scroll::-webkit-scrollbar { display: none; }
+  .show-card-horiz { flex: 0 0 auto; width: 165px; text-align: center; }
+  .card-poster {
+    width: 100%; aspect-ratio: 3/4.5; background-size: cover; background-position: center;
+    border-radius: 12px; position: relative; margin-bottom: 8px; overflow: hidden;
+  }
+  .ranking-badge {
+    position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white;
+    font-weight: 700; font-size: 0.85rem; padding: 2px 8px; border-radius: 4px;
+  }
+  .card-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 18px; }
+  @media (min-width: 768px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } }
+  @media (min-width: 1024px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); } }
+  .show-card-grid { border-radius: 12px; overflow: hidden; position: relative; }
+  .show-card-grid .card-poster { aspect-ratio: 3/4.5; width: 100%; background-size: cover; }
+  .poster-badge {
+    position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white;
+    padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;
+  }
+  .poster-badge.right { left: auto; right: 8px; }
+  .card-meta-grid { padding: 6px 8px; font-size: 0.75rem; color: rgba(255,255,255,0.7); }
+  .card-title-grid { font-weight: 600; font-size: 0.85rem; margin-top: 2px; padding: 0 8px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .toggle-tabs { display: flex; gap: 6px; }
+  .toggle-tab {
+    padding: 6px 14px; border-radius: 30px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1); font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+  }
+  .toggle-tab.active { background: var(--popup-btn); color: var(--popup-btn-text); border-color: var(--popup-btn); font-weight: 600; }
+
+  /* Sidebar */
+  .sidebar-widget {
+    background: var(--show-info-bg); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 16px; margin-bottom: 20px;
+  }
+  .sidebar-widget .section-title { font-size: 1.2rem; margin-bottom: 12px; }
+
+  /* Schedule widget */
+  .esw-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .esw-title {
+    font-size: 13px; font-weight: 700; color: var(--text-widget-title);
+    letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px;
+  }
+  .esw-clock {
+    display: flex; align-items: center; gap: 7px; background: var(--bg-header);
+    border: 1px solid var(--btn-primary); border-radius: 999px; padding: 5px 12px; flex-shrink: 0;
+  }
+  .esw-clock-world { width: 14px; height: 14px; flex-shrink: 0; }
+  .esw-clock-inner { display: flex; align-items: center; gap: 6px; }
+  .esw-clock-date { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .esw-clock-sep { font-size: 10px; color: rgba(255,255,255,0.3); }
+  .esw-clock-time { font-size: 11px; font-weight: 700; color: var(--text-widget-title); }
+  .esw-days { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; gap: 0; }
+  .esw-nav { background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 4px; transition: color 0.2s, background 0.2s; }
+  .esw-nav:hover { color: var(--popup-btn); background: var(--bg-header); }
+  .esw-days-scroll { display: flex; gap: 4px; flex: 1; overflow: hidden; justify-content: space-between; }
+  .esw-day-card { flex: 1; min-width: 0; background: var(--bg-header); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 6px 2px; text-align: center; cursor: pointer; transition: all 0.18s; user-select: none; }
+  .esw-day-card:hover { border-color: var(--popup-btn); background: var(--show-info-bg); }
+  .esw-day-card.esw-active { background: var(--btn-primary); border-color: var(--popup-btn); }
+  .esw-day-card.esw-today { border-color: var(--link-accent) !important; }
+  .esw-day-card.esw-today .esw-dc-day { color: var(--link-accent); }
+  .esw-dc-day { font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; }
+  .esw-dc-date { font-size: 15px; font-weight: 800; color: #fff; line-height: 1.1; margin: 1px 0; }
+  .esw-dc-month { font-size: 8px; color: rgba(255,255,255,0.5); }
+  .esw-day-card.esw-active .esw-dc-day, .esw-day-card.esw-active .esw-dc-date, .esw-day-card.esw-active .esw-dc-month { color: #fff; }
+  .esw-day-card.esw-today.esw-active .esw-dc-day { color: var(--link-accent); }
+  .esw-body { padding: 4px 0; }
+  .esw-status-bar { font-size: 11px; color: rgba(255,255,255,0.4); padding: 4px 0 8px; display: flex; align-items: center; gap: 5px; }
+  .esw-rows { display: flex; flex-direction: column; gap: 5px; }
+  .esw-row { display: flex; align-items: center; gap: 8px; background: var(--bg-header); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: all 0.18s; text-decoration: none; color: inherit; }
+  .esw-row:hover { border-color: var(--popup-btn); background: var(--show-info-bg); }
+  .esw-row-time { font-size: 11px; font-weight: 700; color: var(--text-widget-title); min-width: 38px; flex-shrink: 0; }
+  .esw-row-title { flex: 1; font-size: 12px; font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .esw-row-ep { font-size: 10px; color: rgba(255,255,255,0.6); background: var(--show-info-bg); border: 1px solid var(--btn-primary); border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0; }
+  .esw-row-btn { width: 26px; height: 26px; border-radius: 50%; background: var(--btn-primary); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+  .esw-row-btn:hover { background: var(--btn-primary-hover); }
+  .esw-row-btn svg { width: 11px; height: 11px; }
+  .esw-aired { opacity: 0.45; }
+  .esw-aired .esw-row-time { color: rgba(255,255,255,0.4); }
+  .esw-more-wrap { margin-top: 8px; display: flex; justify-content: flex-end; }
+  .esw-more-btn { background: none; border: 1px solid var(--btn-primary); color: var(--popup-btn); border-radius: 6px; padding: 4px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .esw-more-btn:hover { background: var(--btn-primary); color: #fff; }
+  .esw-empty { text-align: center; padding: 20px 12px; color: rgba(255,255,255,0.4); font-size: 12px; }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .main-layout { flex-direction: column; padding: 0 1rem; }
+    .main-content { flex: none; width: 100%; }
+    .right-sidebar { width: 100%; }
+  }
+  @media (max-width: 768px) {
+    .hero-slider { height: 55vh; }
+    .slider-nav .slider-arrow { display: none; }
+    .horizontal-scroll { gap: 12px; }
+    .show-card-horiz { width: 135px; }
+    .esw-clock { padding: 4px 10px; gap: 4px; }
+    .esw-clock-date { font-size: 9px; }
+    .esw-clock-time { font-size: 10px; }
+    .esw-dc-date { font-size: 13px; }
+    .esw-row-title { font-size: 11px; }
+  }
+  @media (max-width: 360px) {
+    .esw-clock-date, .esw-clock-sep { display: none; }
+  }
+</style>
+
+<script>
+  // ---------- HERO SLIDER ----------
+  const slidesContainer = document.getElementById('slidesContainer');
+  const prevBtn = document.getElementById('prevSlide');
+  const nextBtn = document.getElementById('nextSlide');
+  const counter = document.getElementById('slideCounter');
+  const dots = document.querySelectorAll('#sliderDots .dot');
+  let currentSlide = 0;
+  const totalSlides = {heroData.length};
+
+  function goToSlide(index) {
+    currentSlide = (index + totalSlides) % totalSlides;
+    slidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
+    counter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+    dots.forEach(d => d.classList.remove('active'));
+    if (dots[currentSlide]) dots[currentSlide].classList.add('active');
+  }
+  prevBtn.addEventListener('click', () => goToSlide(currentSlide - 1));
+  nextBtn.addEventListener('click', () => goToSlide(currentSlide + 1));
+  dots.forEach(dot => dot.addEventListener('click', () => goToSlide(parseInt(dot.dataset.index))));
+  setInterval(() => goToSlide(currentSlide + 1), 6000);
+  goToSlide(0);
+
+  // ---------- HORIZONTAL SCROLL ----------
+  function setupScroll(containerId, leftBtnId, rightBtnId) {
+    const container = document.getElementById(containerId);
+    const left = document.getElementById(leftBtnId);
+    const right = document.getElementById(rightBtnId);
+    if (!container || !left || !right) return;
+    left.addEventListener('click', () => container.scrollBy({ left: -350, behavior: 'smooth' }));
+    right.addEventListener('click', () => container.scrollBy({ left: 350, behavior: 'smooth' }));
+  }
+  setupScroll('topAiringScroll', 'topAiringLeft', 'topAiringRight');
+  setupScroll('upcomingScroll', 'upcomingLeft', 'upcomingRight');
+
+  // ---------- NEW RELEASES TOGGLE ----------
+  const releaseTabs = document.querySelectorAll('#releaseTabs .toggle-tab');
+  const grid = document.getElementById('newReleasesGrid');
+  const titleElem = document.getElementById('newReleasesTitle');
+  releaseTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      releaseTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const filter = tab.dataset.filter;
+      grid.querySelectorAll('.show-card-grid').forEach(card => {
+        card.style.display = (filter === 'all' || card.dataset.type === filter) ? '' : 'none';
       });
+      titleElem.textContent = filter === 'all' ? 'New Releases' : `Latest ${tab.textContent}`;
     });
+  });
 
-    // ---------- HEART TOGGLE ----------
-    document.querySelectorAll('.btn-heart').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const pressed = btn.getAttribute('aria-pressed') === 'true';
-        btn.setAttribute('aria-pressed', String(!pressed));
-      });
+  // ---------- HEART TOGGLE ----------
+  document.querySelectorAll('.btn-heart').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pressed = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!pressed));
     });
+  });
 
-    // ---------- SWIPE ----------
-    let touchStartX = 0;
-    slidesContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
-    slidesContainer.addEventListener('touchend', e => {
-      const diff = touchStartX - e.changedTouches[0].screenX;
-      if (Math.abs(diff) > 50) goToSlide(diff > 0 ? currentSlide + 1 : currentSlide - 1);
-    });
+  // ---------- SWIPE ----------
+  let touchStartX = 0;
+  slidesContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
+  slidesContainer.addEventListener('touchend', e => {
+    const diff = touchStartX - e.changedTouches[0].screenX;
+    if (Math.abs(diff) > 50) goToSlide(diff > 0 ? currentSlide + 1 : currentSlide - 1);
+  });
 
-    // ---------- EPISODE SCHEDULE WIDGET ----------
-    (function(){
-      const scheduleRaw = {JSON.stringify(scheduleData)};
-      const DAY_S = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      const MON_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const DAY_F = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      let weekOffset = 0, selDay = 0, showCount = 6, weekDays = [];
+  // ---------- EPISODE SCHEDULE WIDGET ----------
+  (function(){
+    const scheduleRaw = {JSON.stringify(scheduleData)};
+    const DAY_S = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const MON_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const DAY_F = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    let weekOffset = 0, selDay = 0, showCount = 6, weekDays = [];
 
-      function pad(n){ return String(n).padStart(2,'0'); }
-      function sameDay(a, b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
-      function isToday(d){ return sameDay(d, new Date()); }
+    function pad(n){ return String(n).padStart(2,'0'); }
+    function sameDay(a, b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+    function isToday(d){ return sameDay(d, new Date()); }
 
-      function buildWeek(){
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const sun = new Date(today);
-        sun.setDate(today.getDate() - today.getDay() + weekOffset * 7);
-        const days = [];
-        for(let i=0; i<7; i++){
-          const d = new Date(sun);
-          d.setDate(sun.getDate() + i);
-          days.push(d);
-        }
-        return days;
+    function buildWeek(){
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const sun = new Date(today);
+      sun.setDate(today.getDate() - today.getDay() + weekOffset * 7);
+      const days = [];
+      for(let i=0; i<7; i++){
+        const d = new Date(sun);
+        d.setDate(sun.getDate() + i);
+        days.push(d);
       }
+      return days;
+    }
 
-      function autoSelectToday(){
-        weekDays = buildWeek();
-        let found = -1;
-        for(let i=0; i<weekDays.length; i++){ if(isToday(weekDays[i])){ found = i; break; } }
-        selDay = found >= 0 ? found : 0;
-      }
+    function autoSelectToday(){
+      weekDays = buildWeek();
+      let found = -1;
+      for(let i=0; i<weekDays.length; i++){ if(isToday(weekDays[i])){ found = i; break; } }
+      selDay = found >= 0 ? found : 0;
+    }
 
-      function getEpisodesForDay(dayDate){
-        const result = [];
-        const now = new Date();
-        const seen = {};
-        for(const ep of scheduleRaw){
-          const airDate = new Date(ep.airDate + 'T' + (ep.airTime || '00:00'));
-          const localAir = new Date(airDate);
-          if(sameDay(localAir, dayDate)){
-            const key = ep.title;
-            if(!seen[key]){
-              seen[key] = true;
-              result.push({
-                time: ep.airTime || '00:00',
-                title: ep.title,
-                url: ep.url,
-                epNum: ep.episodeNumber || 1,
-                aired: localAir < now
-              });
-            }
+    function getEpisodesForDay(dayDate){
+      const result = [];
+      const now = new Date();
+      const seen = {};
+      for(const ep of scheduleRaw){
+        const airDate = new Date(ep.airDate + 'T' + (ep.airTime || '00:00'));
+        const localAir = new Date(airDate);
+        if(sameDay(localAir, dayDate)){
+          const key = ep.title;
+          if(!seen[key]){
+            seen[key] = true;
+            result.push({
+              time: ep.airTime || '00:00',
+              title: ep.title,
+              url: ep.url,
+              epNum: ep.episodeNumber || 1,
+              aired: localAir < now
+            });
           }
         }
-        result.sort((a,b) => a.time.localeCompare(b.time));
-        return result;
       }
+      result.sort((a,b) => a.time.localeCompare(b.time));
+      return result;
+    }
 
-      function renderDays(){
-        weekDays = buildWeek();
-        const scroll = document.getElementById('esw-days-scroll');
-        if(!scroll) return;
-        let html = '';
-        for(let i=0; i<7; i++){
-          const d = weekDays[i];
-          let cls = 'esw-day-card';
-          if(isToday(d)) cls += ' esw-today';
-          if(i === selDay) cls += ' esw-active';
-          html += `<div class="${cls}" data-esw-i="${i}">
-            <div class="esw-dc-day">${DAY_S[d.getDay()]}</div>
-            <div class="esw-dc-date">${d.getDate()}</div>
-            <div class="esw-dc-month">${MON_S[d.getMonth()]}</div>
-          </div>`;
-        }
-        scroll.innerHTML = html;
-        scroll.querySelectorAll('.esw-day-card').forEach(card => {
-          card.addEventListener('click', function(){
-            selDay = parseInt(this.getAttribute('data-esw-i'));
-            showCount = 6;
-            renderDays();
-            renderRows();
-          });
+    function renderDays(){
+      weekDays = buildWeek();
+      const scroll = document.getElementById('esw-days-scroll');
+      if(!scroll) return;
+      let html = '';
+      for(let i=0; i<7; i++){
+        const d = weekDays[i];
+        let cls = 'esw-day-card';
+        if(isToday(d)) cls += ' esw-today';
+        if(i === selDay) cls += ' esw-active';
+        html += `<div class="${cls}" data-esw-i="${i}">
+          <div class="esw-dc-day">${DAY_S[d.getDay()]}</div>
+          <div class="esw-dc-date">${d.getDate()}</div>
+          <div class="esw-dc-month">${MON_S[d.getMonth()]}</div>
+        </div>`;
+      }
+      scroll.innerHTML = html;
+      scroll.querySelectorAll('.esw-day-card').forEach(card => {
+        card.addEventListener('click', function(){
+          selDay = parseInt(this.getAttribute('data-esw-i'));
+          showCount = 6;
+          renderDays();
+          renderRows();
         });
-      }
+      });
+    }
 
-      function renderRows(){
-        const dayDate = weekDays[selDay];
-        if(!dayDate) return;
-        const episodes = getEpisodesForDay(dayDate);
-        const rowsEl = document.getElementById('esw-rows');
-        const statusEl = document.getElementById('esw-status');
-        const moreWrap = document.getElementById('esw-more-wrap');
-        const moreBtn = document.getElementById('esw-more-btn');
-        if(!rowsEl) return;
-        const dLabel = isToday(dayDate) ? 'Today' : DAY_F[dayDate.getDay()];
-        statusEl.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> ${dLabel}, ${MON_S[dayDate.getMonth()]} ${dayDate.getDate()} — ${episodes.length} episode${episodes.length!==1?'s':''}`;
-        if(episodes.length === 0){
-          rowsEl.innerHTML = '<div class="esw-empty">No episodes scheduled</div>';
-          moreWrap.style.display = 'none';
-          return;
-        }
-        const visible = episodes.slice(0, showCount);
-        rowsEl.innerHTML = visible.map(ep => `
-          <a class="esw-row${ep.aired?' esw-aired':''}" href="${ep.url}">
-            <span class="esw-row-time">${ep.time.slice(0,5)}</span>
-            <span class="esw-row-title">${ep.title}</span>
-            <span class="esw-row-ep">EP ${pad(ep.epNum)}</span>
-            <span class="esw-row-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href='${ep.url}'">
-              <svg viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </span>
-          </a>
-        `).join('');
-        if(episodes.length > showCount){
-          moreWrap.style.display = 'flex';
-          moreBtn.textContent = `Show more (${episodes.length - showCount} more)`;
-        } else {
-          moreWrap.style.display = 'none';
-        }
+    function renderRows(){
+      const dayDate = weekDays[selDay];
+      if(!dayDate) return;
+      const episodes = getEpisodesForDay(dayDate);
+      const rowsEl = document.getElementById('esw-rows');
+      const statusEl = document.getElementById('esw-status');
+      const moreWrap = document.getElementById('esw-more-wrap');
+      const moreBtn = document.getElementById('esw-more-btn');
+      if(!rowsEl) return;
+      const dLabel = isToday(dayDate) ? 'Today' : DAY_F[dayDate.getDay()];
+      statusEl.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> ${dLabel}, ${MON_S[dayDate.getMonth()]} ${dayDate.getDate()} — ${episodes.length} episode${episodes.length!==1?'s':''}`;
+      if(episodes.length === 0){
+        rowsEl.innerHTML = '<div class="esw-empty">No episodes scheduled</div>';
+        moreWrap.style.display = 'none';
+        return;
       }
-
-      // Clock
-      function startClock(){
-        function tick(){
-          const n = new Date();
-          const h = n.getHours(), mi = n.getMinutes();
-          const ampm = h >= 12 ? 'PM' : 'AM';
-          const h12 = h % 12 || 12;
-          const timeEl = document.getElementById('esw-time');
-          const dateEl = document.getElementById('esw-date');
-          if(timeEl) timeEl.textContent = pad(h12)+':'+pad(mi)+' '+ampm;
-          if(dateEl) dateEl.textContent = pad(n.getDate())+'/'+pad(n.getMonth()+1)+'/'+n.getFullYear();
-        }
-        tick();
-        setInterval(tick, 30000);
+      const visible = episodes.slice(0, showCount);
+      rowsEl.innerHTML = visible.map(ep => `
+        <a class="esw-row${ep.aired?' esw-aired':''}" href="${ep.url}">
+          <span class="esw-row-time">${ep.time.slice(0,5)}</span>
+          <span class="esw-row-title">${ep.title}</span>
+          <span class="esw-row-ep">EP ${pad(ep.epNum)}</span>
+          <span class="esw-row-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href='${ep.url}'">
+            <svg viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </span>
+        </a>
+      `).join('');
+      if(episodes.length > showCount){
+        moreWrap.style.display = 'flex';
+        moreBtn.textContent = `Show more (${episodes.length - showCount} more)`;
+      } else {
+        moreWrap.style.display = 'none';
       }
+    }
 
-      // Init
+    // Clock
+    function startClock(){
+      function tick(){
+        const n = new Date();
+        const h = n.getHours(), mi = n.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        const timeEl = document.getElementById('esw-time');
+        const dateEl = document.getElementById('esw-date');
+        if(timeEl) timeEl.textContent = pad(h12)+':'+pad(mi)+' '+ampm;
+        if(dateEl) dateEl.textContent = pad(n.getDate())+'/'+pad(n.getMonth()+1)+'/'+n.getFullYear();
+      }
+      tick();
+      setInterval(tick, 30000);
+    }
+
+    // Init
+    autoSelectToday();
+    renderDays();
+    renderRows();
+    startClock();
+
+    document.getElementById('esw-prev').addEventListener('click', ()=>{
+      weekOffset--;
       autoSelectToday();
       renderDays();
       renderRows();
-      startClock();
-
-      document.getElementById('esw-prev').addEventListener('click', ()=>{
-        weekOffset--;
-        autoSelectToday();
-        renderDays();
-        renderRows();
-      });
-      document.getElementById('esw-next').addEventListener('click', ()=>{
-        weekOffset++;
-        selDay = 0;
-        renderDays();
-        renderRows();
-      });
-      document.getElementById('esw-more-btn').addEventListener('click', ()=>{
-        showCount += 6;
-        renderRows();
-      });
-    })();
-  </script>
-</body>
-</html>
+    });
+    document.getElementById('esw-next').addEventListener('click', ()=>{
+      weekOffset++;
+      selDay = 0;
+      renderDays();
+      renderRows();
+    });
+    document.getElementById('esw-more-btn').addEventListener('click', ()=>{
+      showCount += 6;
+      renderRows();
+    });
+  })();
+</script>
