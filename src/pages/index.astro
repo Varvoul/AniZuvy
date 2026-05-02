@@ -1,8 +1,7 @@
 ---
 // ============================================================
 // Muvix‑VQ – Homepage (index.astro)
-// Two‑column layout: Main 70% + Right Sidebar 30%
-// Hero slider full width
+// Edge‑to‑edge layout: main content + fixed right sidebar
 // ============================================================
 
 // ---------- ENVIRONMENT ----------
@@ -249,7 +248,6 @@ async function fetchMostPopular() {
 // 8. EPISODE SCHEDULE – Fetch from TMDB + Jikan
 // ============================================================
 async function fetchScheduleData() {
-  // Get today and 6 days ahead
   const today = new Date();
   const dates = [];
   for (let i = 0; i < 7; i++) {
@@ -258,25 +256,16 @@ async function fetchScheduleData() {
     dates.push(d.toISOString().slice(0, 10));
   }
 
-  // Fetch TMDB TV airing today + this week
   const [tmdbAiringToday, tmdbOnAir] = await Promise.all([
     fetchTMDB('/tv/airing_today', 'language=en-US'),
     fetchTMDB('/tv/on_the_air', 'language=en-US&page=1')
   ]);
 
-  // Fetch Jikan schedules for each day
-  const jikanPromises = dates.map(date =>
-    fetchJikan('schedules', `filter=monday&kids=false&limit=15`)
-      .catch(() => ({ data: [] }))
-  );
-  // Jikan /schedules uses day names; we'll fetch the current day's schedule
   const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
   const todayDayName = dayNames[today.getDay()];
   const jikanSchedule = await fetchJikan('schedules', `filter=${todayDayName}&kids=false&limit=50`);
 
-  // Process TMDB results
   const scheduleMap = {};
-
   function addToSchedule(showId, title, url, airDate, airTime, episodeNumber, country) {
     const key = `${showId}-${airDate}`;
     if (!scheduleMap[key]) {
@@ -287,11 +276,7 @@ async function fetchScheduleData() {
     }
   }
 
-  // TMDB TV shows
-  const allTMDBTV = [
-    ...(tmdbAiringToday.results || []),
-    ...(tmdbOnAir.results || [])
-  ];
+  const allTMDBTV = [...(tmdbAiringToday.results || []), ...(tmdbOnAir.results || [])];
   for (const show of allTMDBTV) {
     const airDate = show.first_air_date || today.toISOString().slice(0, 10);
     addToSchedule(
@@ -305,7 +290,6 @@ async function fetchScheduleData() {
     );
   }
 
-  // Jikan anime schedule
   for (const anime of jikanSchedule.data || []) {
     const broadcastDay = anime.broadcast?.day || todayDayName;
     const broadcastTime = anime.broadcast?.time || '00:00';
@@ -446,13 +430,23 @@ const completedData = completedFirstPage;
     .dot { width: 8px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 50%; cursor: pointer; }
     .dot.active { background: white; }
 
-    /* ---------- TWO‑COLUMN LAYOUT ---------- */
+    /* ---------- TWO‑COLUMN LAYOUT (Edge‑to‑edge) ---------- */
     .main-layout {
-      max-width: 1400px; margin: 0 auto; padding: 0 20px;
-      display: flex; gap: 30px;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0;                  /* no left/right padding on desktop */
+      display: flex;
+      gap: 2rem;                  /* gap‑8 = 2rem */
+      align-items: flex-start;
     }
-    .main-content { flex: 0 0 65%; min-width: 0; }
-    .right-sidebar { flex: 0 0 35%; min-width: 300px; }
+    .main-content {
+      flex: 1;                    /* takes all remaining space */
+      min-width: 0;               /* allow shrinking for grid */
+    }
+    .right-sidebar {
+      width: 340px;               /* fixed width between 320‑350 */
+      flex-shrink: 0;
+    }
 
     /* ---------- SECTIONS ---------- */
     .section { margin: 30px 0; }
@@ -619,9 +613,12 @@ const completedData = completedFirstPage;
 
     /* ---------- RESPONSIVE ---------- */
     @media (max-width: 1024px) {
-      .main-layout { flex-direction: column; }
-      .main-content { flex: 1 1 auto; }
-      .right-sidebar { flex: 1 1 auto; min-width: auto; }
+      .main-layout {
+        flex-direction: column;
+        padding: 0 1rem;   /* px‑4 on mobile */
+      }
+      .main-content { flex: none; width: 100%; }
+      .right-sidebar { width: 100%; }
     }
     @media (max-width: 768px) {
       .hero-slider { height: 55vh; }
@@ -693,10 +690,10 @@ const completedData = completedFirstPage;
     </div>
   </section>
 
-  <!-- ===== MAIN LAYOUT (Two Columns) ===== -->
+  <!-- ===== MAIN LAYOUT (Two Columns, edge‑to‑edge) ===== -->
   <div class="main-layout">
 
-    <!-- ===== LEFT: MAIN CONTENT (65%) ===== -->
+    <!-- ===== LEFT: MAIN CONTENT (flexible) ===== -->
     <div class="main-content">
 
       <!-- Top Airing -->
@@ -796,7 +793,7 @@ const completedData = completedFirstPage;
       </section>
     </div>
 
-    <!-- ===== RIGHT: SIDEBAR (35%) ===== -->
+    <!-- ===== RIGHT: FIXED SIDEBAR ===== -->
     <aside class="right-sidebar">
 
       <!-- Trending Now -->
