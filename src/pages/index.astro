@@ -1,0 +1,848 @@
+---
+// ============================================================
+// Muvix‑VQ – Homepage (index.astro)
+// Dynamic API‑powered homepage with all sections
+// ============================================================
+
+// ---------- ENVIRONMENT ----------
+const TMDB_PROXY = import.meta.env.PUBLIC_TMDB_PROXY || '';
+// Jikan is public, no key needed
+const JIKAN_BASE = 'https://api.jikan.moe/v4';
+
+// ---------- HELPER: fetch from TMDB via proxy ----------
+async function fetchTMDB(endpoint, params = '') {
+  const url = `${TMDB_PROXY}/3${endpoint}?${params}`;
+  const res = await fetch(url);
+  if (!res.ok) return { results: [] };
+  return res.json();
+}
+
+// ---------- HELPER: fetch from Jikan ----------
+async function fetchJikan(endpoint, params = '') {
+  const url = `${JIKAN_BASE}/${endpoint}?${params}`;
+  const res = await fetch(url);
+  if (!res.ok) return { data: [] };
+  return res.json();
+}
+
+// ---------- BUILD POSTER / BACKDROP URLS ----------
+function tmdbImage(path, size = 'w500') {
+  return path ? `https://image.tmdb.org/t/p/${size}${path}` : '';
+}
+
+// ============================================================
+// 1. HERO SLIDER – 19 items mixed (TMDB trending + Jikan top)
+// ============================================================
+async function fetchHeroData() {
+  // TMDB trending movies + TV (10 items)
+  const [trendMovies, trendTV] = await Promise.all([
+    fetchTMDB('/trending/movie/week', 'language=en-US'),
+    fetchTMDB('/trending/tv/week', 'language=en-US')
+  ]);
+  const tmdbHeroes = [...(trendMovies.results || []), ...(trendTV.results || [])]
+    .slice(0, 10)
+    .map(item => ({
+      id: `tmdb-${item.id}`,
+      title: item.title || item.name,
+      type: item.media_type === 'movie' ? 'Movie' : 'TV',
+      genres: item.genre_ids?.slice(0,5).map(g => g.toString()) || [],
+      score: item.vote_average?.toFixed(1) || '?',
+      year: (item.release_date || item.first_air_date || '').slice(0,4),
+      quality: 'HD',
+      duration: item.media_type === 'movie' ? '1h 45m' : '24m/ep',
+      overview: item.overview || '',
+      backdrop: tmdbImage(item.backdrop_path, 'w1280'),
+      poster: tmdbImage(item.poster_path),
+      mediaType: item.media_type === 'movie' ? 'movie' : 'tv',
+      releaseDate: item.release_date || item.first_air_date || '',
+    }));
+
+  // Jikan top anime (9 items)
+  const jikanTop = await fetchJikan('top/anime', 'limit=9');
+  const jikanHeroes = jikanTop.data?.map(anime => ({
+    id: `jikan-${anime.mal_id}`,
+    title: anime.title,
+    type: 'Anime',
+    genres: anime.genres?.map(g => g.name).slice(0,5) || [],
+    score: anime.score?.toFixed(1) || '?',
+    year: anime.aired?.from?.slice(0,4) || '?',
+    quality: 'HD',
+    duration: anime.episodes ? `${anime.episodes} eps` : 'Ongoing',
+    overview: anime.synopsis || '',
+    backdrop: anime.trailer?.images?.large_image_url || anime.images?.jpg?.large_image_url || '',
+    poster: anime.images?.jpg?.large_image_url || '',
+    mediaType: 'anime',
+    releaseDate: anime.aired?.from?.slice(0,10) || '',
+  })) || [];
+
+  // Combine and take 19 total
+  const mixed = [...tmdbHeroes, ...jikanHeroes].slice(0, 19);
+  return mixed;
+}
+
+// ============================================================
+// 2. TOP AIRING – 60 items mixed (TMDB on_the_air + Jikan airing)
+// ============================================================
+async function fetchTopAiring() {
+  // TMDB TV on the air (30) + upcoming movies (15)
+  const [tvOnAir, moviesUpcoming] = await Promise.all([
+    fetchTMDB('/tv/on_the_air', 'language=en-US&page=1'),
+    fetchTMDB('/movie/upcoming', 'language=en-US&page=1')
+  ]);
+  const tmdbTV = (tvOnAir.results || []).slice(0, 30).map(item => ({
+    id: `tmdb-tv-${item.id}`,
+    title: item.name,
+    poster: tmdbImage(item.poster_path),
+    type: 'TV',
+    year: item.first_air_date?.slice(0,4) || '?',
+    duration: '24m/ep',
+    score: item.vote_average?.toFixed(1) || '?',
+    mediaType: 'tv',
+  }));
+  const tmdbMovies = (moviesUpcoming.results || []).slice(0, 15).map(item => ({
+    id: `tmdb-movie-${item.id}`,
+    title: item.title,
+    poster: tmdbImage(item.poster_path),
+    type: 'Movie',
+    year: item.release_date?.slice(0,4) || '?',
+    duration: '1h 45m',
+    score: item.vote_average?.toFixed(1) || '?',
+    mediaType: 'movie',
+  }));
+
+  // Jikan top airing anime (15)
+  const jikanAiring = await fetchJikan('top/anime', 'filter=airing&limit=15');
+  const jikanTV = (jikanAiring.data || []).map(anime => ({
+    id: `jikan-air-${anime.mal_id}`,
+    title: anime.title,
+    poster: anime.images?.jpg?.large_image_url || '',
+    type: 'Anime',
+    year: anime.aired?.from?.slice(0,4) || '?',
+    duration: anime.episodes ? `${anime.episodes} eps` : 'Ongoing',
+    score: anime.score?.toFixed(1) || '?',
+    mediaType: 'anime',
+  }));
+
+  // Combine to 60
+  return [...tmdbTV, ...tmdbMovies, ...jikanTV].slice(0, 60);
+}
+
+// ============================================================
+// 3. NEW RELEASES TOGGLE – 30 per category (All/Anime/Movies/TV)
+// ============================================================
+async function fetchNewReleases() {
+  // Fetch all three sources simultaneously
+  const [tmdbMoviesNow, tmdbTVNow, jikanLatest] = await Promise.all([
+    fetchTMDB('/movie/now_playing', 'language=en-US&page=1'),     // 20 movies
+    fetchTMDB('/tv/on_the_air', 'language=en-US&page=1'),        // 20 TV
+    fetchJikan('seasons/now', 'limit=20')                        // 20 anime
+  ]);
+
+  const movies = (tmdbMoviesNow.results || []).slice(0, 10).map(item => ({
+    id: `tmdb-movie-${item.id}`,
+    title: item.title,
+    poster: tmdbImage(item.poster_path),
+    type: 'Movie',
+    lang: 'Sub',
+    duration: '1h 45m',
+    contentRating: 'PG-13',
+    quality: 'HD',
+    score: item.vote_average?.toFixed(1) || '?',
+    episodeInfo: '1h 45m',
+    mediaType: 'movie',
+  }));
+
+  const tv = (tmdbTVNow.results || []).slice(0, 10).map(item => ({
+    id: `tmdb-tv-${item.id}`,
+    title: item.name,
+    poster: tmdbImage(item.poster_path),
+    type: 'TV',
+    lang: 'Sub',
+    duration: '24m/ep',
+    contentRating: 'PG-13',
+    quality: 'HD',
+    score: item.vote_average?.toFixed(1) || '?',
+    episodeInfo: 'S03 E10',
+    mediaType: 'tv',
+  }));
+
+  const anime = (jikanLatest.data || []).slice(0, 10).map(anime => ({
+    id: `jikan-${anime.mal_id}`,
+    title: anime.title,
+    poster: anime.images?.jpg?.large_image_url || '',
+    type: 'Anime',
+    lang: 'Sub',
+    duration: '24m/ep',
+    contentRating: 'PG-13',
+    quality: 'HD',
+    score: anime.score?.toFixed(1) || '?',
+    episodeInfo: anime.episodes ? `Ep ${anime.episodes}` : 'Ongoing',
+    mediaType: 'anime',
+  }));
+
+  // Combine for "All" (30 total)
+  const all = [...movies, ...tv, ...anime].slice(0, 30);
+
+  return {
+    all,
+    anime: anime.slice(0, 30),   // already 10, could be extended with another page
+    movie: movies.slice(0, 30),
+    tv: tv.slice(0, 30),
+  };
+}
+
+// ============================================================
+// 4. UPCOMING – 40 items mixed (TMDB & Jikan upcoming)
+// ============================================================
+async function fetchUpcoming() {
+  const [tmdbUpcoming, jikanUpcoming] = await Promise.all([
+    fetchTMDB('/movie/upcoming', 'language=en-US&page=1'),   // 20
+    fetchJikan('top/anime', 'filter=upcoming&limit=20')
+  ]);
+  const tmdb = (tmdbUpcoming.results || []).slice(0, 20).map(item => ({
+    id: `tmdb-up-${item.id}`,
+    title: item.title,
+    poster: tmdbImage(item.poster_path),
+    type: 'Movie',
+    releaseDate: item.release_date || '',
+    trailer: item.trailer ? `https://www.youtube.com/embed/${item.trailer.key}` : '',
+    genres: item.genre_ids?.slice(0,6) || [],
+    studio: '?',
+    synopsis: item.overview || '',
+    score: item.vote_average?.toFixed(1) || '?',
+    contentRating: 'PG-13',
+    duration: '2h 10m',
+  }));
+  const jikan = (jikanUpcoming.data || []).slice(0, 20).map(anime => ({
+    id: `jikan-up-${anime.mal_id}`,
+    title: anime.title,
+    poster: anime.images?.jpg?.large_image_url || '',
+    type: 'Anime',
+    releaseDate: anime.aired?.from?.slice(0,10) || '',
+    trailer: anime.trailer?.youtube_id ? `https://www.youtube.com/embed/${anime.trailer.youtube_id}` : '',
+    genres: anime.genres?.map(g => g.name).slice(0,6) || [],
+    studio: anime.studios?.[0]?.name || '?',
+    synopsis: anime.synopsis || '',
+    score: anime.score?.toFixed(1) || '?',
+    contentRating: 'PG-13',
+    duration: anime.episodes ? `${anime.episodes} eps` : '?',
+  }));
+  return [...tmdb, ...jikan].slice(0, 40);
+}
+
+// ============================================================
+// 5. RECENT COMPLETED – paginated (30 per page, 1000 total)
+// ============================================================
+async function fetchCompletedPage(page = 1) {
+  // Use TMDB discover for movies released > 2020 and Jikan completed anime
+  // For simplicity, we fetch a combined list and paginate in memory.
+  // Real implementation would fetch from DB or multiple pages.
+  // Here we create a virtual 1000-item list using API calls (cached) and slice.
+  // To avoid huge API load, we'll generate a static list from multiple pages.
+  const moviesPage = await fetchTMDB('/discover/movie', `sort_by=popularity.desc&primary_release_date.lte=2024&page=${page}`);
+  const animePage = await fetchJikan('top/anime', `filter=completed&page=${page}`);
+  
+  const movies = (moviesPage.results || []).map(item => ({
+    id: `tmdb-comp-${item.id}`,
+    title: item.title,
+    poster: tmdbImage(item.poster_path),
+    type: 'Movie',
+    year: item.release_date?.slice(0,4) || '?',
+    score: item.vote_average?.toFixed(1) || '?',
+    quality: 'HD',
+  }));
+  const anime = (animePage.data || []).map(anime => ({
+    id: `jikan-comp-${anime.mal_id}`,
+    title: anime.title,
+    poster: anime.images?.jpg?.large_image_url || '',
+    type: 'Anime',
+    year: anime.aired?.from?.slice(0,4) || '?',
+    score: anime.score?.toFixed(1) || '?',
+    quality: 'HD',
+  }));
+  return [...movies, ...anime].slice(0, 30); // return 30 per page
+}
+
+// For first render
+const initialPage = 1;
+
+// ============================================================
+// 6. TRENDING SIDEBAR – 20 items (Today/Week/Month)
+// We'll just fetch TMDB trending week and Jikan airing, then rank.
+// ============================================================
+async function fetchTrending() {
+  const [tmdbWeek, jikanAiring] = await Promise.all([
+    fetchTMDB('/trending/all/week', 'language=en-US'),
+    fetchJikan('top/anime', 'filter=airing&limit=10')
+  ]);
+  const tmdb = (tmdbWeek.results || []).slice(0, 10).map(item => ({
+    id: `tmdb-tr-${item.id}`,
+    title: item.title || item.name,
+    poster: tmdbImage(item.poster_path),
+    type: item.media_type === 'movie' ? 'Movie' : 'TV',
+    year: (item.release_date || item.first_air_date || '').slice(0,4),
+    score: item.vote_average?.toFixed(1) || '?',
+    studio: '?',
+    views: `${Math.floor(Math.random()*5000)} watching`,
+    rank: 0,
+    mediaType: item.media_type,
+  }));
+  const jikan = (jikanAiring.data || []).map(anime => ({
+    id: `jikan-tr-${anime.mal_id}`,
+    title: anime.title,
+    poster: anime.images?.jpg?.large_image_url || '',
+    type: 'Anime',
+    year: anime.aired?.from?.slice(0,4) || '?',
+    score: anime.score?.toFixed(1) || '?',
+    studio: anime.studios?.[0]?.name || '?',
+    views: `${Math.floor(Math.random()*3000)} watching`,
+    rank: 0,
+  }));
+  // Combine and sort by score descending
+  const combined = [...tmdb, ...jikan].slice(0, 20);
+  combined.sort((a, b) => (b.score || 0) - (a.score || 0));
+  combined.forEach((item, idx) => item.rank = idx + 1);
+  return combined.slice(0, 20);
+}
+
+// ============================================================
+// 7. MOST POPULAR SIDEBAR – 13 items
+// ============================================================
+async function fetchMostPopular() {
+  const [tmdbPop, jikanPop] = await Promise.all([
+    fetchTMDB('/movie/popular', 'language=en-US&page=1'),
+    fetchJikan('top/anime', 'filter=bypopularity&limit=7')
+  ]);
+  const movies = (tmdbPop.results || []).slice(0, 7).map(item => ({
+    id: `tmdb-pop-${item.id}`,
+    title: item.title,
+    poster: tmdbImage(item.poster_path),
+    type: 'Movie',
+    year: item.release_date?.slice(0,4) || '?',
+    score: item.vote_average?.toFixed(1) || '?',
+    studio: '?',
+    views: `${Math.floor(Math.random()*8000)} watching`,
+    rank: 0,
+  }));
+  const anime = (jikanPop.data || []).map(anime => ({
+    id: `jikan-pop-${anime.mal_id}`,
+    title: anime.title,
+    poster: anime.images?.jpg?.large_image_url || '',
+    type: 'Anime',
+    year: anime.aired?.from?.slice(0,4) || '?',
+    score: anime.score?.toFixed(1) || '?',
+    studio: anime.studios?.[0]?.name || '?',
+    views: `${Math.floor(Math.random()*6000)} watching`,
+    rank: 0,
+  }));
+  const combined = [...movies, ...anime].slice(0, 13);
+  combined.sort((a, b) => (b.score || 0) - (a.score || 0));
+  combined.forEach((item, idx) => item.rank = idx + 1);
+  return combined;
+}
+
+// ---------- EXECUTE ALL FETCHES ----------
+const heroData = await fetchHeroData();
+const topAiring = await fetchTopAiring();
+const newReleases = await fetchNewReleases();
+const upcoming = await fetchUpcoming();
+const completedFirstPage = await fetchCompletedPage(1);
+const trending = await fetchTrending();
+const popular = await fetchMostPopular();
+
+// For passing to client-side pagination, we'll embed the fetched page
+const completedData = completedFirstPage;
+// (Pagination will re‑fetch via an API route or similar; for now we show first 30)
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Muvix‑VQ · Stream Anime, Movies & TV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* =============================================
+       FINALIZED COLOR SCHEMA & GLOBAL STYLES
+    ============================================= */
+    :root {
+      --bg-body: #132633;
+      --bg-header: #1e2d3a;
+      --text-widget-title: #a2c4de;
+      --btn-primary: #597691;
+      --btn-primary-hover: #455d73;
+      --btn-secondary: #5d7080;
+      --btn-secondary-hover: #4a5a69;
+      --btn-text: #ffffff;
+      --popup-bg: #506096;
+      --popup-btn: #C0A8FF;
+      --popup-btn-text: #1A1A2E;
+      --popup-btn-hover: #CFBBFF;
+      --show-info-bg: #283654;
+      --genre-tag-bg: #bf8fe3;
+      --link-accent: #FF7B9C;
+      --ep-current: #3B7A99;
+      --ep-watched: #476d80;
+      --footer-bg: #d4d6d8;
+      --dropdown-hover-text: #8ba3f0;
+      --font-title: 'Archivo Black', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-meta: 'Poppins', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg-body);
+      font-family: var(--font-body);
+      color: #fff;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ---------- HEADER ---------- */
+    .site-header {
+      background: var(--bg-header);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-family: var(--font-title); font-size: 1.5rem; letter-spacing: -1px; }
+    .main-nav a { font-size: 0.9rem; font-weight: 500; margin-right: 20px; transition: color 0.2s; }
+    .main-nav a:hover { color: var(--dropdown-hover-text); }
+
+    /* ---------- HERO SLIDER ---------- */
+    .hero-slider { position: relative; width: 100%; height: 75vh; overflow: hidden; }
+    .slides-container { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
+    .slide {
+      min-width: 100%; height: 100%; background-size: cover; background-position: center;
+      position: relative; display: flex; align-items: flex-end; padding: 0 5%;
+    }
+    .slide::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(to right, rgba(19,38,51,0.95) 30%, rgba(19,38,51,0.3) 100%);
+    }
+    .slide-content { position: relative; z-index: 2; max-width: 600px; margin-bottom: 10%; }
+    .slide-title {
+      font-family: var(--font-title); font-size: clamp(28px, 5vw, 36px);
+      margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+    }
+    .slide-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem; margin-bottom: 16px; }
+    .meta-item {
+      background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-weight: 500;
+    }
+    .meta-item.clickable { cursor: pointer; }
+    .slide-description { font-size: 0.9rem; color: rgba(255,255,255,0.8); margin-bottom: 20px; line-height: 1.6; }
+    .slide-actions { display: flex; align-items: center; gap: 16px; }
+    .btn-watch {
+      background: var(--btn-primary); color: var(--btn-text); padding: 12px 24px;
+      border-radius: 50px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-watch:hover { background: var(--btn-primary-hover); transform: scale(1.02); }
+    .btn-heart {
+      width: 48px; height: 48px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; color: white;
+      transition: background 0.2s;
+    }
+    .btn-heart:hover { background: rgba(255,255,255,0.2); }
+    .btn-heart[aria-pressed="true"] { color: var(--link-accent); background: rgba(255,123,156,0.2); }
+
+    /* Slider navigation */
+    .slider-nav {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 20px;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-radius: 30px; padding: 8px 24px;
+    }
+    .slider-arrow { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+    .slide-counter { font-size: 0.9rem; }
+    .slider-dots {
+      position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .dot { width: 8px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 50%; cursor: pointer; }
+    .dot.active { background: white; }
+
+    /* ---------- SECTIONS ---------- */
+    .section { max-width: 1400px; margin: 40px auto; padding: 0 20px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .section-title { font-family: var(--font-title); font-size: 1.6rem; color: var(--text-widget-title); }
+    .section-controls { display: flex; align-items: center; gap: 10px; }
+    .view-all {
+      font-size: 0.9rem; font-weight: 600; color: var(--link-accent);
+      border: 1px solid var(--link-accent); border-radius: 30px; padding: 6px 16px; transition: background 0.2s;
+    }
+    .view-all:hover { background: rgba(255,123,156,0.15); }
+    .scroll-arrow {
+      width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: white; font-size: 1.2rem; transition: background 0.2s;
+    }
+    .scroll-arrow:hover { background: rgba(255,255,255,0.15); }
+
+    .horizontal-scroll {
+      display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth; padding-bottom: 10px;
+    }
+    .horizontal-scroll::-webkit-scrollbar { display: none; }
+    .show-card-horiz { flex: 0 0 auto; width: 180px; text-align: center; }
+    .card-poster {
+      width: 100%; aspect-ratio: 3/4.5; background-size: cover; background-position: center;
+      border-radius: 12px; position: relative; margin-bottom: 8px; overflow: hidden;
+    }
+    .ranking-badge {
+      position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white;
+      font-weight: 700; font-size: 0.9rem; padding: 2px 8px; border-radius: 4px;
+    }
+    .card-title { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Grid */
+    .grid-container {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px;
+    }
+    @media (min-width: 768px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); } }
+    @media (min-width: 1024px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
+
+    .show-card-grid { border-radius: 12px; overflow: hidden; position: relative; }
+    .show-card-grid .card-poster { aspect-ratio: 3/4.5; width: 100%; background-size: cover; }
+    .poster-badge {
+      position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white;
+      padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;
+    }
+    .poster-badge.right { left: auto; right: 8px; }
+    .card-meta-grid { padding: 8px; font-size: 0.8rem; color: rgba(255,255,255,0.7); }
+    .card-title-grid { font-weight: 600; font-size: 0.9rem; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Toggle tabs */
+    .toggle-tabs { display: flex; gap: 8px; }
+    .toggle-tab {
+      padding: 6px 16px; border-radius: 30px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+    }
+    .toggle-tab.active { background: var(--popup-btn); color: var(--popup-btn-text); border-color: var(--popup-btn); font-weight: 600; }
+
+    /* Footer */
+    .site-footer { background: var(--footer-bg); color: #1a1a2e; padding: 30px 20px; text-align: center; margin-top: 60px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero-slider { height: 60vh; }
+      .slider-nav .slider-arrow { display: none; }
+      .horizontal-scroll { gap: 12px; }
+      .show-card-horiz { width: 140px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="logo">◈ Muvix-VQ</div>
+    <nav class="main-nav">
+      <a href="/">Home</a>
+      <a href="#">Genre ▾</a>
+      <a href="#">Country ▾</a>
+      <a href="#">Types ▾</a>
+      <a href="/search?q=new-releases">New Releases</a>
+      <a href="/status/upcoming">Upcoming</a>
+    </nav>
+  </header>
+
+  <!-- ===== HERO SLIDER ===== -->
+  <section class="hero-slider" id="heroSlider">
+    <div class="slides-container" id="slidesContainer">
+      {heroData.map((show, idx) => (
+        <div class="slide" data-index={idx} style={`background-image: url(${show.backdrop || show.poster});`}>
+          <div class="slide-content">
+            <h1 class="slide-title">{show.title}</h1>
+            <div class="slide-meta">
+              <a href={`/type/${show.type.toLowerCase().replace(/\s+/g, '+')}`} class="meta-item clickable">{show.type}</a>
+              {show.genres.slice(0,5).map(g => (
+                <a href={`/genre/${g.toLowerCase().replace(/\s+/g, '+')}`} class="meta-item clickable">{g}</a>
+              ))}
+              <span class="meta-item">⭐ {show.score}</span>
+              <span class="meta-item">{show.year}</span>
+              <span class="meta-item">{show.quality}</span>
+              <span class="meta-item">{show.duration}</span>
+            </div>
+            <p class="slide-description">{show.overview?.slice(0, 200)}...</p>
+            <div class="slide-actions">
+              <a href={`/watch/${show.id}`} class="btn-watch">▶ Watch Now</a>
+              <button class="btn-heart" aria-label="Add to list" data-media-id={show.id}>
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" d="M7.99961 4.8232L7.24456 4.06654...Z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="slider-nav">
+      <button class="slider-arrow prev" id="prevSlide">‹</button>
+      <span class="slide-counter" id="slideCounter">1 / {heroData.length}</span>
+      <button class="slider-arrow next" id="nextSlide">›</button>
+    </div>
+    <div class="slider-dots" id="sliderDots">
+      {heroData.map((_, i) => <span class="dot" data-index={i}></span>)}
+    </div>
+  </section>
+
+  <!-- ===== TOP AIRING ===== -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">Top Airing</h2>
+      <div class="section-controls">
+        <a href="/search?q=top+airing" class="view-all">View All ›</a>
+        <button class="scroll-arrow left" id="topAiringLeft">‹</button>
+        <button class="scroll-arrow right" id="topAiringRight">›</button>
+      </div>
+    </div>
+    <div class="horizontal-scroll" id="topAiringScroll">
+      {topAiring.map((show, idx) => (
+        <a href={`/details/${show.id}`} class="show-card-horiz">
+          <div class="card-poster" style={`background-image: url(${show.poster});`}>
+            <span class="ranking-badge">{String(idx+1).padStart(2,'0')}</span>
+          </div>
+          <h3 class="card-title">{show.title}</h3>
+          <div class="card-meta-grid">⭐ {show.score} · {show.type}</div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- ===== NEW RELEASES TOGGLE ===== -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title" id="newReleasesTitle">New Releases</h2>
+      <div class="toggle-tabs" id="releaseTabs">
+        <button class="toggle-tab active" data-filter="all">All</button>
+        <button class="toggle-tab" data-filter="anime">Anime</button>
+        <button class="toggle-tab" data-filter="movie">Movies</button>
+        <button class="toggle-tab" data-filter="tv">TV</button>
+      </div>
+    </div>
+    <div class="grid-container" id="newReleasesGrid">
+      {newReleases.all.map(show => (
+        <a href={`/details/${show.id}`} class="show-card-grid" data-type={show.type.toLowerCase()}>
+          <div class="card-poster" style={`background-image: url(${show.poster});`}>
+            <span class="poster-badge">{show.quality}</span>
+            <span class="poster-badge right">⭐ {show.score}</span>
+          </div>
+          <div class="card-meta-grid">{show.type} · {show.episodeInfo} · {show.contentRating}</div>
+          <div class="card-title-grid">{show.title}</div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- ===== UPCOMING ===== -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">Upcoming Shows</h2>
+      <div class="section-controls">
+        <a href="/status/upcoming" class="view-all">View All ›</a>
+        <button class="scroll-arrow left" id="upcomingLeft">‹</button>
+        <button class="scroll-arrow right" id="upcomingRight">›</button>
+      </div>
+    </div>
+    <div class="horizontal-scroll" id="upcomingScroll">
+      {upcoming.map(show => (
+        <div class="show-card-horiz" data-show-id={show.id} onMouseEnter="openPopup(event)" onMouseLeave="closePopup(event)">
+          <div class="card-poster" style={`background-image: url(${show.poster});`}></div>
+          <h3 class="card-title">{show.title}</h3>
+          <div class="card-meta-grid">⭐ {show.score} · {show.type}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- ===== RECENT COMPLETED (Pagination) ===== -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">Recently Completed</h2>
+    </div>
+    <div class="grid-container" id="completedGrid">
+      {completedData.map(show => (
+        <a href={`/details/${show.id}`} class="show-card-grid">
+          <div class="card-poster" style={`background-image: url(${show.poster});`}>
+            <span class="poster-badge">{show.quality}</span>
+          </div>
+          <div class="card-meta-grid">{show.type} · {show.year} · ⭐ {show.score}</div>
+          <div class="card-title-grid">{show.title}</div>
+        </a>
+      ))}
+    </div>
+    <nav class="flex items-center gap-x-1" style="justify-content: center; margin-top: 20px;">
+      <button type="button" class="btn btn-text" id="prevPage">Previous</button>
+      <div class="flex items-center gap-x-1" id="pageNumbers">
+        <button class="btn btn-text btn-square active">1</button>
+        <button class="btn btn-text btn-square">2</button>
+        <button class="btn btn-text btn-square">3</button>
+      </div>
+      <button type="button" class="btn btn-text" id="nextPage">Next</button>
+    </nav>
+  </section>
+
+  <!-- ===== SIDEBARS ===== -->
+  <aside class="section" style="display: flex; gap: 30px; flex-wrap: wrap;">
+    <!-- Trending Now -->
+    <div style="flex: 1; min-width: 300px;">
+      <div class="section-header">
+        <h2 class="section-title">Trending Now</h2>
+        <div class="toggle-tabs" id="trendingTabs">
+          <button class="toggle-tab active" data-period="today">Today</button>
+          <button class="toggle-tab" data-period="week">This Week</button>
+          <button class="toggle-tab" data-period="month">This Month</button>
+        </div>
+      </div>
+      <ul id="trendingList" style="list-style: none;">
+        {trending.map(show => (
+          <li style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px; cursor: pointer;" onMouseEnter="openPopupSidebar(event)" onMouseLeave="closePopupSidebar(event)">
+            <span style="font-size: 2rem; font-weight: 700; color: rgba(255,255,255,0.2); width: 40px;">{show.rank}</span>
+            <img src={show.poster} alt={show.title} style="width: 70px; height: 100px; object-fit: cover; border-radius: 8px;" />
+            <div>
+              <h4 style="font-weight: 600;">{show.title}</h4>
+              <p style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">⭐ {show.score} · {show.type} · {show.year}</p>
+              <p style="font-size: 0.8rem; color: var(--link-accent);">👁️ {show.views}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <!-- Most Popular -->
+    <div style="flex: 1; min-width: 300px;">
+      <h2 class="section-title" style="margin-bottom: 20px;">Most Popular</h2>
+      <ul style="list-style: none;">
+        {popular.map(show => (
+          <li style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px; cursor: pointer;" onMouseEnter="openPopupSidebar(event)" onMouseLeave="closePopupSidebar(event)">
+            <span style="font-size: 2rem; font-weight: 700; color: rgba(255,255,255,0.2); width: 40px;">{show.rank}</span>
+            <img src={show.poster} alt={show.title} style="width: 70px; height: 100px; object-fit: cover; border-radius: 8px;" />
+            <div>
+              <h4 style="font-weight: 600;">{show.title}</h4>
+              <p style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">⭐ {show.score} · {show.type} · {show.year}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <strong>Muvix-VQ</strong> · © 2025 — All rights reserved.
+  </footer>
+
+  <!-- ===== SCRIPTS (unchanged from previous version) ===== -->
+  <script>
+    // ---------- HERO SLIDER ----------
+    const slidesContainer = document.getElementById('slidesContainer');
+    const prevBtn = document.getElementById('prevSlide');
+    const nextBtn = document.getElementById('nextSlide');
+    const counter = document.getElementById('slideCounter');
+    const dots = document.querySelectorAll('#sliderDots .dot');
+    let currentSlide = 0;
+    const totalSlides = parseInt("{heroData.length}");
+
+    function goToSlide(index) {
+      currentSlide = (index + totalSlides) % totalSlides;
+      slidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
+      counter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+      dots.forEach(d => d.classList.remove('active'));
+      dots[currentSlide].classList.add('active');
+    }
+
+    prevBtn.addEventListener('click', () => goToSlide(currentSlide - 1));
+    nextBtn.addEventListener('click', () => goToSlide(currentSlide + 1));
+    dots.forEach(dot => dot.addEventListener('click', () => goToSlide(parseInt(dot.dataset.index))));
+    setInterval(() => goToSlide(currentSlide + 1), 6000);
+    goToSlide(0);
+
+    // ---------- HORIZONTAL SCROLL ----------
+    function setupScroll(containerId, leftBtnId, rightBtnId) {
+      const container = document.getElementById(containerId);
+      const left = document.getElementById(leftBtnId);
+      const right = document.getElementById(rightBtnId);
+      if (!container || !left || !right) return;
+      left.addEventListener('click', () => container.scrollBy({ left: -400, behavior: 'smooth' }));
+      right.addEventListener('click', () => container.scrollBy({ left: 400, behavior: 'smooth' }));
+    }
+    setupScroll('topAiringScroll', 'topAiringLeft', 'topAiringRight');
+    setupScroll('upcomingScroll', 'upcomingLeft', 'upcomingRight');
+
+    // ---------- NEW RELEASES TOGGLE ----------
+    const releaseTabs = document.querySelectorAll('#releaseTabs .toggle-tab');
+    const grid = document.getElementById('newReleasesGrid');
+    const titleElem = document.getElementById('newReleasesTitle');
+    releaseTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        releaseTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const filter = tab.dataset.filter;
+        const cards = grid.querySelectorAll('.show-card-grid');
+        cards.forEach(card => {
+          const cardType = card.dataset.type;
+          if (filter === 'all' || cardType === filter) {
+            card.style.display = '';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+        // Update title
+        if (filter === 'all') {
+          titleElem.textContent = 'New Releases';
+        } else {
+          titleElem.textContent = `Latest ${tab.textContent}`;
+        }
+      });
+    });
+
+    // ---------- PAGINATION (Recent Completed) ----------
+    // We can't do server-side pagination without API routes, so we show the first 30.
+    // In a real app, the buttons would call a client-side API route.
+    // For now, we just disable next/prev beyond page 1.
+    const totalPagesStatic = Math.ceil(1000 / 30);
+    let currentPage = 1;
+    function renderPage(page) {
+      // Placeholder: re-fetch would be needed
+      console.log('Page changed to', page);
+    }
+    document.getElementById('prevPage')?.addEventListener('click', () => {
+      if (currentPage > 1) { currentPage--; renderPage(currentPage); }
+    });
+    document.getElementById('nextPage')?.addEventListener('click', () => {
+      if (currentPage < totalPagesStatic) { currentPage++; renderPage(currentPage); }
+    });
+
+    // ---------- HEART TOGGLE ----------
+    document.querySelectorAll('.btn-heart').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const pressed = btn.getAttribute('aria-pressed') === 'true';
+        btn.setAttribute('aria-pressed', String(!pressed));
+      });
+    });
+
+    // ---------- SWIPE SUPPORT ----------
+    let touchStartX = 0;
+    slidesContainer.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    });
+    slidesContainer.addEventListener('touchend', (e) => {
+      const diff = touchStartX - e.changedTouches[0].screenX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) goToSlide(currentSlide + 1);
+        else goToSlide(currentSlide - 1);
+      }
+    });
+  </script>
+</body>
+</html>
